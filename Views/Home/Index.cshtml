@@ -1,0 +1,57 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Document</title>
+</head>
+<body>
+	<input type="text" name="name" value="" />
+	<button id="submit">Submit</button>
+	
+	<hr/>
+
+	<ul id="content-list"></ul>
+
+	<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
+	<script>
+		const connection = new signalR.HubConnectionBuilder()
+			.withUrl("https://localhost:7190/chat")
+			.configureLogging(signalR.LogLevel.Information)
+			.build();
+
+		async function start() {
+			try {
+				await connection.start();
+				console.log("SignalR Connected.");
+			} catch (err) {
+				console.log(err);
+				setTimeout(start, 5000);
+			}
+		}
+		// nhận sự kiện emit từ server
+		connection.on("server-send-message", function (data) {
+			console.log(data);
+			document.querySelector("#content-list").innerHTML += `<li>${data}</li>`
+		});
+
+		document.getElementById("submit").addEventListener("click", async function (event) {
+			const message = document.querySelector("input").value;
+
+			connection.invoke("SendMessage", message).catch(function (err) {
+				return console.log(err) //.error(err.toString());
+			});
+
+			//fetch("@Url.Action("TestData","Home")")
+
+			event.preventDefault();
+		});
+
+		connection.onclose(async () => {
+			await start();
+		});
+
+		start();
+	</script>
+</body>
+</html>
