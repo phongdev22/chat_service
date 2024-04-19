@@ -1,111 +1,68 @@
-﻿using chat_service.Models;
-using chat_service.MyDbContext;
+﻿using chat_service.MyDbContext;
 using Microsoft.AspNetCore.Mvc;
-using System.Text;
 using Newtonsoft.Json;
-using chat_service.Services;
+using chat_service.Entities;
+using ZaloDotNetSDK;
 using Microsoft.AspNetCore.Authorization;
+
 
 namespace chat_service.Controllers
 {
 
-    //[Authorize]
-    [Route("api/[controller]")]
-    [ApiController]
-    public class MessageController : ControllerBase
-    {
-		private IConfiguration _config;
+	[Authorize]
+	[ApiController]
+	[Route("api/[controller]")]
+	public class MessageController : ControllerBase
+	{
 		private readonly ApplicationDbContext _dbContext;
-		private MessageSenderService _messageSenderService;
-
-
-		private HttpClient _client = new HttpClient();
-		private string? access_token;
-		public MessageController(IConfiguration config,
-								 ApplicationDbContext dbContext,
-								 MessageSenderService messageSenderService)
-        {
-			_config = config;
+		public MessageController(ApplicationDbContext dbContext)
+		{
 			_dbContext = dbContext;
-			access_token = "" ;//Request.Headers["access_token"].ToString() ?? "";
-			_messageSenderService = messageSenderService;
 		}
 
-        [HttpPost("send")]
-        public async Task<IActionResult> Send([FromBody]ChatContentModel content)
-        {
-
-			return Ok(content);
-
+		[HttpPost("send")]
+		public IActionResult Send([FromBody] ApiRequest content)
+		{
 			try
 			{
-				// send text
-				var PostData = this.TypeMessageHandler(content);
-				var request = new HttpRequestMessage(HttpMethod.Post, _config["Zalo:API_V3"] + "/message/cs");
+				content.username = HttpContext.User.Identity.Name;
+				var accessToken = Request.Headers["zToken"];
+				object? result = null;
+				
+				var zClient = new ZaloClient(accessToken);
 
-				request.Headers.Add("access_token", this.access_token);
-				request.Content = new StringContent(JsonConvert.SerializeObject(PostData), Encoding.UTF8, "application/json");
-
-				var response = await _client.SendAsync(request);
-				if (response.IsSuccessStatusCode)
+				if (content.reply_id != null)
 				{
-					var stringContent = await response.Content.ReadAsStringAsync();
-					var JsonResponse = JsonConvert.DeserializeObject<ApiResponse>(stringContent);
-					
-					// save log data response, data post and message_id
-					if(JsonResponse.error == 0 && JsonResponse.message == "Success")
-					{
-
-						// add log message & add dialog status
-						_dbContext.MessageLogs.Add(new Entities.MessageLog
-						{
-							message_id = JsonResponse.data.message_id,
-							to_user_id = content.user_id,
-							data_request = PostData.ToString(),
-							data_response = stringContent,
-						});
-
-						_dbContext.SaveChanges();
-
-						//======================================
-						
-						await _messageSenderService.SendMessageToUser(content.user_id, JsonResponse.data.message_id, content);
-						return Ok(new { Code = 0, Data = content });
-					}
-
+					result = zClient.sendTextMessageToMessageId(content.reply_id, content.text);
 				}
-				return Ok(new {Code = 1, Data = response});
+				else if (content.file != null)
+				{
+					var file = new ZaloFile(content.file.FileName);
+					result = new { Message = "No support in recent!" };
+				}
+				else
+				{
+					result = zClient.sendTextMessageToUserIdV3(content.to_user_id, content.text);
+					_dbContext.MessageLogs.Add(new MessageLog()
+					{
+						data_request = JsonConvert.SerializeObject(content),
+						data_response = JsonConvert.SerializeObject(result),
+						status =  true
+					});
+					_dbContext.SaveChanges();
+				}
+
+				return new ContentResult
+				{
+					Content = result.ToString(),
+					ContentType = "application/json",
+					StatusCode = 200
+				};
 			}
 			catch (Exception ex)
 			{
-				Console.WriteLine(ex.ToString());
-				return Ok(new { Code = 1, Message = ex.Message});
+				return Ok(new { Code = 1, Message = ex.Message });
 			}
-        }
-
-		private dynamic TypeMessageHandler(ChatContentModel content)
-		{
-			dynamic data = new System.Dynamic.ExpandoObject();
-
-			data.recipient = new { user_id = content.user_id };
-			switch (content.type_message)
-			{
-				case "text":
-					data.message = new { text = content.message.text };
-					break;
-
-				case "reply":
-					data.message = new
-					{
-						text = content.message.text,
-						quote_message_id = content.message.quote_message_id
-					};
-					break;
-				default:
-					break;
-			}
-
-			return data;
 		}
 	}
 
@@ -130,6 +87,18 @@ namespace chat_service.Controllers
 		public required Data data { get; set; }
 		public int error { get; set; }
 		public string? message { get; set; }
+	}
+
+	public class ApiRequest
+	{
+		// username hệ thống cấp
+		public string? username { get; set; }
+
+		// user_id của zalo
+		public required string to_user_id { get; set; }
+		public required string text { get; set; }
+		public string? reply_id { get; set; }
+		public IFormFile? file { get; set; }
 	}
 
 }

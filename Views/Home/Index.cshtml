@@ -6,8 +6,10 @@
 	<title>Document</title>
 </head>
 <body>
-	<input type="text" name="name" value="" />
-	<button id="submit">Submit</button>
+	<form id="form">
+		<input type="text" name="name" value="" />
+		<button id="submit">Submit</button>
+	</form>
 	
 	<hr/>
 
@@ -16,7 +18,7 @@
 	<script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-signalr/6.0.1/signalr.js"></script>
 	<script>
 		const connection = new signalR.HubConnectionBuilder()
-			.withUrl("https://localhost:7190/chat")
+			.withUrl("https://localhost:7190/chat", { withCredentials: false })
 			.configureLogging(signalR.LogLevel.Information)
 			.build();
 
@@ -30,21 +32,44 @@
 			}
 		}
 		// nhận sự kiện emit từ server
-		connection.on("server-send-message", function (data) {
-			console.log(data);
-			document.querySelector("#content-list").innerHTML += `<li>${data}</li>`
+		connection.on("new-message", function (data) {
+			document.querySelector("#content-list").innerHTML += `<li>${data.sender.id}: ${data.message.text}</li>`
 		});
 
-		document.getElementById("submit").addEventListener("click", async function (event) {
+		document.getElementById("form").addEventListener("submit", async function (event) {
+			event.preventDefault();
 			const message = document.querySelector("input").value;
 
-			connection.invoke("SendMessage", message).catch(function (err) {
-				return console.log(err) //.error(err.toString());
-			});
+			const data = {
+				"app_id": "xxxxxxx",
+				"user_id_by_app": "xxxxxxx",
+				"event_name": "user_send_text",
+				"sender": {
+					"id": "phongzann"
+				},
+				"recipient": {
+					"id": "12342dasd231dhayw3" // OA id
+				},
+				"message": {
+					"msg_id": generateRandomString(16),
+					"text": document.querySelector("input").value
+				},
+				"time": 1234515123124
+			}
 
-			//fetch("@Url.Action("TestData","Home")")
+			// connection.invoke("SendMessage", data).catch(function (err) {
+			// 	return console.log(err) //.error(err.toString());
+			// });
+			
+			await fetch("https://localhost:7190/api/webhook/event", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json"
+				},
+				body: JSON.stringify(data)
+			})
 
-			event.preventDefault();
+			document.querySelector("input").value = ""
 		});
 
 		connection.onclose(async () => {
@@ -52,6 +77,16 @@
 		});
 
 		start();
+
+		function generateRandomString(length) {
+			var result = '';
+			var characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+			var charactersLength = characters.length;
+			for (var i = 0; i < length; i++) {
+				result += characters.charAt(Math.floor(Math.random() * charactersLength));
+			}
+			return result;
+		}
 	</script>
 </body>
 </html>

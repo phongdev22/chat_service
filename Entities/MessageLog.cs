@@ -5,11 +5,11 @@ namespace chat_service.Entities
 	public class MessageLog
 	{
 		[Key]
-		public required string message_id { get; set; }
-		public required string to_user_id { get; set; }
-		public required string data_request {  get; set; }	
-		public required string data_response {  get; set; }	
-		public string? from_user_id { get; set; }
+		public string Id { get; set; }	= Guid.NewGuid().ToString();
+		public string? message_id { get; set; }
+		public string? data_request {  get; set; }
+		public string? data_response {  get; set; }
 		public bool status { get; set; }
+		public DateTime time { get; set; } = DateTime.UtcNow;
 	}
 }

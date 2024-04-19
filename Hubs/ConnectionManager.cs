@@ -8,21 +8,23 @@ namespace chat_service.Hubs
 
 		public void AddConnection(string connectionId, dynamic value)
 		{
-			_connections.TryAdd(connectionId, value);
+			_connections.TryAdd(connectionId, "");
 		}
 
-		public string FilterConnectionFree()
+		public List<string> GetListOnline(List<string> users)
 		{
-			var conenctionId = "";
-
-			var connection = _connections.FirstOrDefault(value => value.Value?.status == true);
-			if (!connection.Equals(default(KeyValuePair<string, dynamic>)))
+			var res = new List<string>();
+			foreach (var user in users)
 			{
-				return connection.Key;
+				var connectionId = GetConnectionId(user);
+				if (connectionId != null)
+				{
+					res.Add(connectionId);
+				}
 			}
-
-			return conenctionId;
+			return res;
 		}
+
 
 		public void RemoveConnection(string connectionId)
 		{
@@ -41,7 +43,7 @@ namespace chat_service.Hubs
 
 		public dynamic? GetUserId(string connectionId)
 		{
-			_connections.TryGetValue(connectionId, out dynamic? value );
+			_connections.TryGetValue(connectionId, out dynamic? value);
 			return value;
 		}
 	}

@@ -1,82 +1,126 @@
-﻿using Azure;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using System;
-using System.Net.WebSockets;
 using System.Text;
 using System.Text.Json;
+using ZaloDotNetSDK;
 
 namespace chat_service.Controllers
 {
-	[Route("api/[controller]")]
+	[Authorize]
 	[ApiController]
+	[Route("api/[controller]")]
 	public class TagController : ControllerBase
 	{
-		private HttpClient _client;
-		private IConfiguration _config;
-		private string? access_token;
-		private string url_api;
-
-		public TagController(IConfiguration config) {
-			_client = new HttpClient();
-			_config = config;
-			access_token = "";  // Request.Headers["access_token"];
-			url_api = _config["Zalo:API_V2"] + "/tag";
-		}
+		public TagController() {}
 
 		[HttpGet]
-		public async Task<IActionResult> Index()
+		public IActionResult Index()
 		{
-			if (access_token == null) return Ok(new { Code = 0, Message = "Access token is invalid!" });
+			try
+			{
+				var accessToken = Request.Headers["access_token"];
+				object? result = null;
 
-			var request = new HttpRequestMessage(HttpMethod.Post, url_api + "/gettagsofoa");
-			request.Headers.Add("access_token", access_token);
-			var response = await _client.SendAsync(request);
+				var zClient = new ZaloClient(accessToken);
+				result = zClient.getAllTagOfOfficialAccount();
 
-			return Ok(response);
+				return new ContentResult
+				{
+					Content = result.ToString(),
+					ContentType = "application/json",
+					StatusCode = 200
+				};
+			}
+			catch (Exception ex)
+			{
+				return Ok(new
+				{
+					Code = 1,
+					Errors = ex.Message
+				});
+			}
 		}
 
 		[HttpDelete]
-		public async Task<IActionResult> Index([FromBody] string tag_name)
+		public IActionResult Delete([FromBody] string tag_name)
 		{
-			if (access_token == null) return Ok(new { Code = 0, Message = "Access token is invalid!" });
-
-			var request = new HttpRequestMessage(HttpMethod.Post, url_api + "/rmtag");
-			request.Headers.Add("access_token", access_token);
-			var response = await _client.SendAsync(request);
-
-			request.Content = new StringContent(JsonSerializer.Serialize(new { tag_name = tag_name })
-												, Encoding.UTF8, "application/json");
-
-			return Ok(response);
+			try
+			{
+				var accessToken = Request.Headers["access_token"];
+				object? result = null;
+				var zClient = new ZaloClient(accessToken);
+				result = zClient.deleteTag(tag_name);
+				
+				return new ContentResult
+				{
+					Content = result.ToString(),
+					ContentType = "application/json",
+					StatusCode = 200
+				};
+			}
+			catch (Exception ex)
+			{
+				return Ok(new
+				{
+					Code = 1,
+					Errors = ex.Message
+				});
+			}
 		}
 
 
 		[HttpPost("create")]
-		public async Task<IActionResult> Create([FromBody]Tag tag)
+		public IActionResult Create([FromBody]Tag tag)
 		{
-			if (access_token == null) return Ok(new {Code = 0, Message = "Access token is invalid!" });
-
-			var request = new HttpRequestMessage(HttpMethod.Post, url_api + "/tagfollower");
-			request.Headers.Add("access_token", access_token);
-			request.Content = new StringContent(JsonSerializer.Serialize(tag), Encoding.UTF8, "application/json");
-			var response = await _client.SendAsync(request);
-
-			return Ok(response);
+			try
+			{
+				var accessToken = Request.Headers["access_token"];
+				object? result = null;
+				var zClient = new ZaloClient(accessToken);
+				result = zClient.tagFollower(tag.user_id, tag.tag_name);
+				
+				return new ContentResult
+				{
+					Content = result.ToString(),
+					ContentType = "application/json",
+					StatusCode = 200
+				};
+			}
+			catch (Exception ex)
+			{
+				return Ok(new
+				{
+					Code = 1,
+					Errors = ex.Message
+				});
+			}
 		}
 
 		[HttpPost("remove")]
-		public async Task<IActionResult> Remove([FromBody]Tag tag)
+		public IActionResult Remove([FromBody]Tag tag)
 		{
-			if (access_token == null) return Ok(new { Code = 0, Message = "Access token is invalid!" });
-
-			var request = new HttpRequestMessage(HttpMethod.Post, url_api + "/rmfollowerfromtag");
-			request.Headers.Add("access_token", access_token);
-			request.Content = new StringContent(JsonSerializer.Serialize(tag), Encoding.UTF8, "application/json");
-			var response = await _client.SendAsync(request);
-
-			return Ok(response);
+			try
+			{
+				var accessToken = Request.Headers["access_token"];
+				object? result = null;
+				var zClient = new ZaloClient(accessToken);
+				result = zClient.removeTagFromFollower(tag.user_id, tag.tag_name);
+				
+				return new ContentResult
+				{
+					Content = result.ToString(),
+					ContentType = "application/json",
+					StatusCode = 200
+				};
+			}
+			catch (Exception ex)
+			{
+				return Ok(new
+				{
+					Code = 1,
+					Errors = ex.Message
+				});
+			}
 		}
 	}
 

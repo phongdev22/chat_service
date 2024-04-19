@@ -1,59 +1,117 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using chat_service.Helpers;
+using ZaloDotNetSDK;
+using NuGet.Protocol;
 using Microsoft.AspNetCore.Authorization;
 
 namespace chat_service.Controllers
 {
-	[Authorize]
-	[Route("api/[controller]")]
+    [Authorize]
     [ApiController]
+	[Route("api/[controller]")]
     public class CustomerController : ControllerBase
     {
         private readonly IConfiguration _config;
         private HttpClient _client;
         private string _url;
-        private string? access_token;
 
         public CustomerController(IConfiguration config) {
             _config = config;
             _client = new HttpClient();
-            access_token = Request.Headers["access_token"];
             _url = _config.GetSection("Zalo")["API_V3"] ?? "";
         }
 
-        [HttpGet]
-        public async Task<IActionResult> Index([FromQuery]string data)
-        {
-            try
-            {
-				if (data != null && !Validator.IsValidJson(data))
-					return Ok(new { Code = 0, Message = "Data is not json format!" });
-
-				if (data == null) { data = "{\"offset\":0,\"count\":10}"; }
-
-				string api_url = _url + "/user/getlist?data=" + data;
+		[HttpGet]
+		public async Task<IActionResult> Customer([FromQuery] Dictionary<string, int> data)
+		{
+			try
+			{
+				string? accessToken = Request.Headers["zToken"] ;
+				string api_url = _url + "/user/getlist?data=" + data.ToJson();
 				var request = new HttpRequestMessage(HttpMethod.Get, api_url);
+				request.Headers.Add("access_token", accessToken);
 
-				// Add access token to the headers
-				request.Headers.Add("access_token", access_token);
-				var response = await _client.GetAsync(api_url);
-
-				return Ok(response);
+				var response = await _client.SendAsync(request);
+				var stringContent = await response.Content.ReadAsStringAsync();
+				return Ok(stringContent);
 			}
-            catch(Exception e) {
-                return Ok(e);
-            }
-        }
-        
-        [HttpGet("info/{id}")]
+			catch (Exception e)
+			{
+				return Ok(e);
+			}
+		}
+
+		[HttpGet("following")]
+        public IActionResult GetFollowers([FromQuery]Dictionary<string, int> data)
+        {
+			try
+			{
+				var accessToken = Request.Headers["zToken"];
+				object? result = null;
+				var zClient = new ZaloClient(accessToken);
+
+				// query param
+				var offset = data.GetValueOrDefault("offset", 0);
+				var count = data.GetValueOrDefault("offset", 10);
+
+				result = zClient.getListFollower(offset, count);
+				return Ok(result);
+			}
+			catch (Exception ex)
+			{
+				return Ok(new
+				{
+					Code = 1,
+					Errors = ex.Message
+				});
+			}
+		}
+
+		/*
+		[HttpGet("followers/profile/{id}")]
+		public IActionResult GetFollowerInfo(string id)
+		{
+			try
+			{
+				var accessToken = Request.Headers["access_token"];
+				object? result = null;
+				var zClient = new ZaloClient(access_token);
+				result = zClient.getProfileOfFollower(id);
+				return Ok(result);
+			}
+			catch (Exception ex)
+			{
+				return Ok(new
+				{
+					Code = 1,
+					Errors = ex.Message
+				});
+			}
+		}
+		*/
+
+        [HttpGet("profile/{id}")]
 		public async Task<IActionResult> Info(string id)
         {
-			string api_url = _url + "/user/detail?data={" + $"\"user_id\" = \"{id}" + "\"}";
-			var request = new HttpRequestMessage(HttpMethod.Get, api_url);
-			// Add access token to the headers
-			request.Headers.Add("access_token", access_token);
-			var response = await _client.GetAsync(api_url);
-            return Ok(response);
+			try
+			{
+				string? accessToken = Request.Headers["zToken"];
+
+				string api_url = _url + "/user/detail?data={" + $"\"user_id\" = \"{id}" + "\"}";
+				var request = new HttpRequestMessage(HttpMethod.Get, api_url);
+				request.Headers.Add("access_token", accessToken);
+
+				var response = await _client.SendAsync(request);
+				var stringContent = await response.Content.ReadAsStringAsync();
+				return Ok(stringContent);
+			}
+			catch (Exception ex)
+			{
+				return Ok(new
+				{
+					Code = 1,
+					Errors = ex.Message
+				});
+			}
 		}
     
     }

@@ -8,5 +8,7 @@ namespace chat_service.Entities
 		public string Id { get; set; }  = Guid.NewGuid().ToString();
 		public required string Username { get; set; }	
 		public required string Password { get; set; }
+		public int MaxCustomer { get; set; } = 10;
 	}
 }
+
